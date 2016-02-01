@@ -1,0 +1,254 @@
+---
+title: 'Statistical Inference: Demonstrating the Central Limit Theorem'
+author: "Austin Taylor"
+date: "December 11, 2015"
+output:
+  html_document:
+    theme: cosmo
+  pdf_document: default
+graphics: yes
+---
+
+##Assignment 1: The CLT
+
+###Overview: Understanding the Central Limit Theorem
+
+The purpose of this assignment is to demonstrate the Central Limit Theorem and its properties. The Central Limit Theorem (CLT) states that the distribution of averages of independent variables, each with a well-defined expected value and a well-defined variance, becomes that of a normal distribution as the sample size increases.
+
+In simpler terms, in any distribution, if we take many sets of samples from that distribution and take the average of each sample, and then plot these averages, we will see that it approximately represents a normal distribution. Further, the mean of this distribution will be approximately equal to the mean of the population, $\mu$, and the standard deviation of this distribution, otherwise known as the standard error, will be approximately equal to the standard deviation of the population, $\sigma$, divided by the square root of the sample size.
+
+Remember, if selected randomly, our sample mean, $\bar{X}$ should estimate our population mean, $\mu$, and our sample variance, $S^2$ should estimate our population variance, $\sigma^2$, given that we have a large enough sample size.
+
+###Part I: Sampling
+
+To demonstrate that the CLT applies to *any* distribution, we will work with an exponential distribution with a mean of $\frac{1}{\lambda}$, standard deviation of $\frac{1}{\lambda}$, and a $\lambda$ value of 0.02. Therefore, the population mean, $\mu$, is equal to 50, and the population standard deviation, $\sigma$, is also equal to 50.
+
+Since we have the theoretical mean and standard deviation of our exponential distribution, we need to generate random samples from this distribution. We use `rexp(n, rate)`, where `n` is the number of data points in each sample, and the `rate` is equal to our $\lambda$ value of 0.02, to generate random samples.
+
+To demonstrate the sampling portion of this, if we want our sample size to be `n = 6`, when we run `rexp(6, rate = 0.02)`, we will get an output of:
+
+```{r}
+set.seed(11)
+rexp(6, rate = 0.02)
+```
+
+These are the six values in our sample from the exponential distribution.
+
+Our sample mean should be a good estimate of the population mean, and our sample variance should be a good estimate of the population variance. With a large enough `n`, our samples should have a mean, $\bar{X}$, of 50 and a sample variance, $S^2$, of 2500 (which is our $\sigma^2$). We can use the above sampling method to test how good of an estimate our sample is, given that we have a large enough `n`.
+
+```{r, echo=TRUE, eval=TRUE}
+set.seed(11)
+n <- 1000 ## Let's make our sample size 1000
+mean(rexp(n, 0.02)) ## Test to see if our sample mean estimates our population mean
+
+set.seed(11)
+var(rexp(n, 0.02)) ## Test to see if our sample variance estimates our population variance
+```
+
+As you can see above, our sample mean and variance accurately estimate our population mean and population variance. The reason why they are not perfectly 50 and 2500 is because this is just a small sample of our overall population distribution. While it will estimate the $\mu$ and $\sigma^2$ fairly well, `n` would have to be $\infty$ to perfectly estimate these values.
+
+###Part II: Running the Code to Examine the CLT
+
+The Central Limit Theorem doesn't just examine one sample mean. We must take the mean of many random samples, each denoted as $\bar{X}$, and plot them on a histogram to see the distribution of these means.
+
+Let's go back to our example of our sample size `n = 6`. When we take the mean of the sample, we get:
+
+```{r}
+set.seed(11)
+mean(rexp(6, rate = 0.02))
+```
+
+This number is not particularly useful in itself. However, when we run the code many times, we can see a clearer picture of the CLT in action. I've looped the code 1000 times and combined the $\bar{X}$ values to a variable called `mean.values`.
+
+```{r, eval=FALSE}
+set.seed(11)
+mean.values <- NULL
+for (j in 1:1000){
+    mean.values <- c(mean.values, mean(rexp(n, .02))) ## n denotes sample size
+    }
+```
+
+The output of our code returns a vector that contains 1000 of these sample means. All that is left is to plot these sample means in a histogram to examine their distribution. To easily understand how the distribution of means becomes more concentrated around the true population mean as `n` increases, I will run the code three times: each time setting `n` to `2`, `40`, and `100`, respectively.
+
+###Part III: Examining the Results
+
+Below shows the progression of the sampling distribution of the sample mean as the sample size increases. Black lines are included to represent both the theoretical normal curve $N(\mu, \frac{\sigma}{\sqrt{n}})$, where $\mu$ = 50 and $\sigma$ = 50, and the $\mu$ itself. The red lines indicate the mean of the sampling distribution of sample means, $\mu_\bar{x}$.
+
+
+```{r,echo=FALSE, eval=TRUE, warning=FALSE, fig.align='center', fig.width=10, fig.height=3}
+
+library(ggplot2); library(gridExtra)
+
+## Run the below code for n values 2, 40, and 100. Each n value is the size of the
+## sample we are taking the average of. As n gets larger, the final histogram we plot
+## should be more conentrated around the true population mean of 1/lambda. In this case
+## our lambda value is .02, giving us a theoretiical population mean of 50.
+
+for (n in c(2, 40, 100)){
+    set.seed(11)
+    ## Clear out our mean.values vector.
+    mean.values <- NULL
+    
+    ## Run the below code 1000 times to get a vector of length 1000.
+    ##
+    ## We take a rexp of sample size n with a lambda value of .02, average them
+    ## together, then concatenate it to a vector 1000 times. Our final mean.values
+    ## value is a vector of 1000 means, each mean is the average of n values.
+    for (j in 1:1000){ 
+        mean.values <- c(mean.values, mean(rexp(n, .02))) ## n denotes how 
+    }
+    
+    ## Plot our 1000 findings in a histogram, which should be normally distributed.
+    p <- qplot(mean.values, 
+              geom = "blank") + 
+      labs(x = paste("n =", n, "\nMean =", round(mean(mean.values), 3), "\nStdDev =", round(sd(mean.values), 3)),
+           y = "") +
+      theme(axis.title = element_text(size = 10, color = "#808080")) +
+      geom_histogram(data = as.data.frame(mean.values), 
+                     aes(y = ..density..), 
+                     binwidth = 1,
+                     alpha = .7) + 
+      scale_x_continuous(limits = c(0, 100)) + 
+      scale_y_continuous(limits = c(0, .1)) +
+      stat_function(fun = dnorm, 
+                    arg = list(mean = 50,
+                               sd = (1/.02) / sqrt(n) ),
+                    colour = "black") +
+      geom_vline(xintercept = 50, 
+                 colour = "black") +
+      geom_vline(xintercept = mean(mean.values), 
+               colour = "red")
+    
+    ## Assign the plot to a string "plot_n", where n is our sample size  .
+    assign(paste0("plot_", n), p)
+}
+
+## Arrange a grid for each plot to show how the histograms become more concentrated
+## around the true population mean as n gets larger.
+
+grid.arrange(plot_2, 
+             plot_40, 
+             plot_100, 
+             ncol = 3,
+             top = "Demonstrating the Central Limit Theorem:\nDistribution of Averages of Sample Size n")
+
+```
+
+When we examine the sampling distribution of sample means for `n = 2`, `40`, and `100`, a clear pattern emerges. As `n` increases, the data in the histogram congregate more closely around the population $\mu$ of 50. Further, each of the standard errors reflects the population $\sigma$, 50, divided by the square root of the sample size. On the graphs, as the sample size increases, the red line shifts closer towards the black line, indicating that the $\mu_\bar{x}$ more accurately estimates $\mu$ when there is more data in our sample. Note that when `n = 100`, the mean of the sampling distribution of sample means lies completely over the black bar, indicating its accuracy in representing the population mean.
+
+The estimated standard error, $\sigma_{\bar{x}}$ when `n = 2` is: $\frac{50}{\sqrt{2}}$, or 35.3553. When `n = 40`, $\sigma_{\bar{x}}$ is: $\frac{50}{\sqrt{40}}$, or 7.9056. And when `n = 100`, $\sigma_{\bar{x}}$ is: $\frac{50}{\sqrt{100}}$, or 5.0. Compare these to the actual standard errors of 33.923, 7.752, and 4.884, respectively. Pretty close!
+
+Our 1000 iterations (i.e. histogram of 1000 data points) gives us a fairly normal distribution with accurate results. However, we would see a distribution that is *more* evenly bell-shaped if we were to use more data points, like `n = 10000` or `n = 100000`.
+
+###Conclusions
+
+The Central Limit Theorem states that when we observe the sampling distribution of sample means, this distribution is approximately normal with a sufficiently large sample size and becomes more focused around the population mean, $\mu$, as the size of our sample increases. We are able to clearly see this from our data. Each of our sampling distributions has a mean that is approximately equal to $\mu$ and a standard error that is approximately equal to $\frac{\sigma}{\sqrt{n}}$. Any discrepancies in our data come from a relatively small amount of iterations (1000). If we were to take many more samples, the data would more accurately reflect a normal distribution.
+
+<hr/>
+
+##Assignment 2: ToothGrowth Data
+
+###Part I: Load the ToothGrowth data and perform some basic exploratory data analysis.
+
+```{r}
+library(datasets)
+data("ToothGrowth")
+head(ToothGrowth)
+c(class(ToothGrowth[,1]), class(ToothGrowth[,2]), class(ToothGrowth[,3]))
+```
+
+###Part II: Provide a basic summary of the data.
+
+```{r}
+summary(ToothGrowth)
+table(ToothGrowth$supp, ToothGrowth$dose)
+c(mean(ToothGrowth$len), sd(ToothGrowth$len))
+library(ggplot2)
+plot <- ggplot(ToothGrowth, aes(x = factor(dose), 
+                                y = len, 
+                                fill = factor(supp))) + 
+        geom_boxplot() +
+        scale_x_discrete("Dosage") +
+        scale_y_continuous("Tooth Length") + 
+        ggtitle("Effect of Dosage on Length of Tooth by Supplement")
+plot
+```
+
+###Part III: Use confidence intervals and/or hypothesis tests to compare tooth growth by supp and dose.
+
+
+###Part IV: State your conclusions and the assumptions needed for your conclusions.
+
+The first thing we can see is that at lower dosages, Orange Juice results in a longer tooth length than Vitamiin C. This is only true for .5 and 1 mg. When the dosage increases to 2 mg, there is no difference in the expected length for the tooth. However, at this dosage, the variability of Vitamin C is greater than that of Orange Juice.
+
+Regardless of the supplement used, a larger dosage results in a larger tooth length.
+
+We assume that the samples we used are representative of the entire population of guinea pigs and are randomly selected. We also assume that the results we observed are not a result of random chance, thereby giving us inaccurate estimates.
+
+###Code
+
+I've included my code below to show how I reached my conclusions for Assignment 1.
+```{r, echo=TRUE, eval=FALSE}
+library(ggplot2); library(gridExtra)
+
+## Run the below code for n values 2, 40, and 100. Each n value is the size of the
+## sample we are taking the average of. As n gets larger, the final histogram we plot
+## should be more conentrated around the true population mean of 1/lambda. In this case
+## our lambda value is .02, giving us a theoretical population mean of 50.
+
+for (n in c(2, 40, 100)){
+  set.seed(11)
+  ## Clear out our mean.values vector.
+  mean.values <- NULL
+  
+  ## Run the below code 1000 times to get a vector of length 1000.
+  ##
+  ## We take a rexp of sample size n with a lambda value of .02, average them
+  ## together, then combine it to a vector 1000 times. Our final mean.values,
+  ## is the entire sampling distribution, with each value being the average of
+  ## the sample size of size n.
+  
+  for (j in 1:1000){ 
+        mean.values <- c(mean.values, mean(rexp(n, .02)))
+    }
+    
+    ## Plot our 1000 findings in a histogram, which should be normally distributed.
+    p <- qplot(mean.values, 
+              geom = "blank") + 
+      labs(x = paste("n =", n, 
+                     "\nMean =", round(mean(mean.values),3), 
+                     "\nStdDev =", round(sd(mean.values),3)),
+           y = "") +
+      theme(axis.title = element_text(size = 10, color = "#808080")) +
+      geom_histogram(data = as.data.frame(mean.values), 
+                     aes(y = ..density..), 
+                     binwidth = 2,
+                     alpha = .7) + 
+      scale_x_continuous(limits = c(0, 100)) + 
+      scale_y_continuous(limits = c(0, .1)) +
+      stat_function(fun = dnorm, 
+                    arg = list(mean = 50,
+                               sd = (1/.02) / sqrt(n) ),
+                    colour = "black") +
+      geom_vline(xintercept = 50, 
+                 colour = "black") +
+      geom_vline(xintercept = mean(mean.values), 
+               colour = "red")
+    
+    ## Assign the plot to a string "plot_n", where n is our sample size.
+    assign(paste0("plot_", n), p)
+}
+
+## Arrange a grid for each plot to show how the histograms become more concentrated
+## around the true population mean as n gets larger.
+
+png("CLT_Distrubutions.png", width = 500, height = 200, units = "px")
+
+grid.arrange(plot_2, 
+             plot_40, 
+             plot_100, 
+             ncol = 3,
+             top = "Demonstrating the Central Limit Theorem:\nDistribution of Averages of Sample Size n")
+
+dev.off()
+```
