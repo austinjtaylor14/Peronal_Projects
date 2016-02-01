@@ -1,0 +1,22 @@
+library(xlsx); library(dplyr); library(rvest); library(foreach)
+
+tickers.portfolio <- read.xlsx2("MSCI_Tickers.xlsx", sheetIndex = 2, stringsAsFactors = FALSE, header = FALSE)
+tickers.portfolio <- gsub("(.*)\\s.*", "\\1", tickers.portfolio$X1)
+
+data <- list()
+
+foreach(i = 1:length(tickers.portfolio)) %dopar% {
+  url <- paste0("http://seekingalpha.com/symbol/",tickers.portfolio[i],"/transcripts")
+  transcripts.page <- html_session(url)
+  link.titles <- transcripts.page %>%
+                    html_nodes(".symbol_article a") %>%
+                        html_text()
+                            
+  for (j in 1:length(link.titles)){
+    transcript <- transcripts.page %>%
+                      follow_link(link.titles[j]) %>%
+                          html_nodes("#article_slice, p") %>%
+                              html_text()
+    data[[tickers.portfolio[i]]][j] <- trimws(paste(transcript, sep = "", collapse = " "))
+  }
+}
