@@ -1,0 +1,67 @@
+library(dplyr); library(stringr); library(tm); library(RSQLite); library(ETLUtils); library(ff); library(ggplot2); library(scales); library(slam)
+
+## Working code
+db <- src_sqlite("database.sqlite", create = F)
+db_subset <- db %>% tbl('May2015')
+df <- tbl_df(data.frame(db_subset))
+df <- mutate(df, created = as.POSIXct(created_utc, origin = "1970-01-01", tz = "GMT"))
+df1 <- df %>% 
+          select(created, ups, score, subreddit, author, body) %>%
+              arrange(subreddit, created, ups)
+
+## We want to consider word contractions as two separate words
+df1$body <- gsub("\\[deleted]", "", df1$body)
+df1$body <- gsub("[^[:alnum:][:space:]']", "", df1$body)
+df1$body <- gsub("[\r\n]", " ", df1$body)
+df1$body <- gsub("n't", " not", df1$body, ignore.case = TRUE)
+df1$body <- gsub("'ve", " have", df1$body, ignore.case = TRUE)
+df1$body <- gsub("i'm", "i am", df1$body, ignore.case = TRUE)
+df1$body <- gsub("i'd", "i would", df1$body, ignore.case = TRUE)
+df1$body <- gsub("how'd", "how did", df1$body, ignore.case = TRUE)
+df1$body <- gsub("'re", " are", df1$body, ignore.case = TRUE)
+df1$body <- gsub("'ll", " will", df1$body, ignore.case = TRUE)
+df1$body <- gsub("he's", "he is", df1$body, ignore.case = TRUE)
+df1$body <- gsub("it's", "it is", df1$body, ignore.case = TRUE)
+df1$body <- gsub("that's", "that is", df1$body, ignore.case = TRUE)
+df1$body <- gsub("who's", "who is", df1$body, ignore.case = TRUE)
+df1$body <- gsub("what's", "what is", df1$body, ignore.case = TRUE)
+df1$body <- gsub("where's", "where is", df1$body, ignore.case = TRUE)
+df1$body <- gsub("when's", "when is", df1$body, ignore.case = TRUE)
+df1$body <- gsub("why's", "why is", df1$body, ignore.case = TRUE)
+df1$body <- gsub("how's", "how is", df1$body, ignore.case = TRUE)
+df1$body <- gsub("here's", "here is", df1$body, ignore.case = TRUE)
+df1$body <- gsub("let's", "let us", df1$body, ignore.case = TRUE)
+df1$body <- gsub("http.*\\s*", " ", df1$body, ignore.case = TRUE)
+df1$body <- gsub("   ", " ", df1$body, ignore.case = TRUE)
+df1$body <- gsub("  ", " ", df1$body, ignore.case = TRUE)
+
+df1$body <- str_trim(df1$body)
+
+corp <- Corpus(VectorSource(df1$body))
+corp <- tm_map(corp, tolower)
+corp <- tm_map(corp, PlainTextDocument)
+dtm <- DocumentTermMatrix(corp, control = list(wordLengths = c(1, Inf)))
+dtm_sparce <- removeSparseTerms(dtm, 0.995)
+df_counts <- as.data.frame(as.matrix(dtm_sparce))
+
+word_counts <- data.frame(words = colnames(df_counts), counts = colSums(df_counts), stringsAsFactors = FALSE)
+sorted_counts <- arrange(word_counts, desc(counts))
+counts_100 <- sorted_counts[1:100,]
+
+## Graphing results
+
+graph <- ggplot(counts_100, aes(x = reorder(words, -counts), y = counts)) +
+          geom_point(shape = 16, size = 1) + theme_minimal() + 
+          labs(title = "Reddit Comments and Zipf's Law", x = "Word", y = "Total Count of Word", size = 10) +
+          theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1.0), axis.text.y = element_text(angle = 25), axis.title.y = element_text(vjust = 1)) +
+          theme(axis.title = element_text(vjust = 1)) +
+          theme(plot.title = element_text(vjust = 1, family = "sans")) +
+          theme(axis.text = element_text(size = 5, color = "#474747"), axis.title = element_text(size = 9, color = "#474747")) +
+          theme(axis.ticks = element_line(size = .3, color = "#474747")) +
+          stat_smooth(aes(y = counts, group = 1), method="loess", formula = y ~ poly(1/x), level = 0, colour="#DC143C") +
+          ##stat_smooth(aes(y = counts, group = 1), method="lm", formula = y ~ poly(1/x,1), level = 0, colour="#DC143C") +
+          guides(colour = FALSE) +
+          theme(plot.title = element_text(size = 12, color = "#474747")) +
+          geom_smooth(method = "exp", aes(group = 1))
+
+ggsave("Zipf's Law Reddit.png")
